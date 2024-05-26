@@ -1,5 +1,5 @@
 import requests
-from random import randint
+from random import randint, choice
 import time
 import threading
 import os
@@ -37,18 +37,43 @@ def load_cookies():
         traceback.print_exc()
         return None
 
+def load_proxies():
+    try:
+        with open('proxies.txt', 'r') as file:
+            proxies = file.read().splitlines()
+            if not proxies:
+                print("Error: proxy file is empty")
+                time.sleep(2)
+                exit()
+            return proxies
+    except Exception as e:
+        print(f'Error in loading proxies: {e}')
+        traceback.print_exc()
+        return None
+
 def send_ally_request():
     cookies_queue = load_cookies()
     if not cookies_queue:
         print("Cookie failure")
+        return
+    
+    proxies = load_proxies()
+    if not proxies:
+        print("Proxy failure")
         return
 
     while True:
         try:
             random_id = randint(min_random_id, max_random_id)
             cookies = {'.ROBLOSECURITY': cookies_queue[0]}  # Get the first cookie in the queue
+            proxy = choice(proxies)  # Select a random proxy
+            
+            proxy_dict = {
+                "http": proxy,
+                "https": proxy,
+            }
 
-            login_response = requests.post('https://auth.roblox.com/v1/login', cookies=cookies)
+            login_response = requests.post('https://auth.roblox.com/v1/login', cookies=cookies, proxies=proxy_dict)
             token = login_response.headers.get('x-csrf-token')
 
             headers = {'x-csrf-token': token}
@@ -56,7 +81,8 @@ def send_ally_request():
             send_ally = requests.post(
                 f'https://groups.roblox.com/v1/groups/{group}/relationships/{allies}/{random_id}',
                 headers=headers,
-                cookies=cookies
+                cookies=cookies,
+                proxies=proxy_dict
             )
 
             if send_ally.status_code == 200:
